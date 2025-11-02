@@ -1,0 +1,629 @@
+{
+  "name": "Drone News Aggregator and Social Media Auto-Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "1485eb31-2d0c-49c8-a46e-0be9bf365112",
+      "name": "Daily News Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -576,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "droneNewsRssUrl",
+              "value": "https://news.google.com/rss/search?q=latest+drone+news&hl=en-IN&gl=IN&ceid=IN:en",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "uavTechRssUrl",
+              "value": "https://news.google.com/rss/search?q=UAV+technology&hl=en-IN&gl=IN&ceid=IN:en",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "dgcaDronesRssUrl",
+              "value": "https://news.google.com/rss/search?q=DGCA+drones+India&hl=en-IN&gl=IN&ceid=IN:en",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "maxArticles",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "googleSheetId",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3e0fa6ed-0da0-4973-89c4-387ed8f0b6f6",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.droneNewsRssUrl }}",
+        "options": {}
+      },
+      "id": "bc3a6b36-8cf4-4c17-a735-85339ca4478f",
+      "name": "Fetch Google News - Drone News",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        28016
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.uavTechRssUrl }}",
+        "options": {}
+      },
+      "id": "10985c0d-bcf0-4a4b-90eb-66f57636eb31",
+      "name": "Fetch Google News - UAV Technology",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.dgcaDronesRssUrl }}",
+        "options": {}
+      },
+      "id": "397d8f98-8d96-4511-86e7-28500f1ffb11",
+      "name": "Fetch Google News - DGCA Drones India",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        28400
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "6f9d7f9b-2d6f-4954-bcae-569635d1340c",
+      "name": "Combine All News Articles",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        96,
+        28192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const articlesInput = $input.first();\nconst historyInput = $input.last();\nconst articles = articlesInput.json ? [articlesInput.json] : $input.all().filter((item, index) => index === 0).map(i => i.json);\nconst postedArticles = historyInput.json ? (Array.isArray(historyInput.json) ? historyInput.json : [historyInput.json]) : $input.all().filter((item, index) => index === 1).map(i => i.json);\nconst postedLinks = new Set(postedArticles.map(item => item['Article Link'] || item.articleLink));\nconst allArticles = Array.isArray(articles[0]) ? articles[0] : articles;\nconst unpostedArticles = allArticles.filter(article => !postedLinks.has(article.link));\nreturn unpostedArticles.map(article => ({ json: article }));"
+      },
+      "id": "72383dff-f9da-4904-9209-ad5bd3db7328",
+      "name": "Filter Unposted Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst sorted = items.sort((a, b) => new Date(b.json.isoDate) - new Date(a.json.isoDate));\nreturn sorted.slice(0, 5);"
+      },
+      "id": "e2bcaf99-6899-4515-974b-e9bedb29e754",
+      "name": "Limit to Top 5 New Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "articleImage"
+            }
+          }
+        }
+      },
+      "id": "62316871-70e3-41b4-af6d-2f7271859893",
+      "name": "Fetch Article Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        992,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a professional social media content creator specializing in drone and UAV technology news. For each article provided, create an engaging social media post with the following structure:\n\n1. Hook Line: A compelling opening that grabs attention (max 15 words)\n2. Summary: A concise 2-3 sentence summary of the article highlighting key points and why it matters\n3. Hashtags: 5-7 relevant hashtags including #UAV #DroneTech #DroneNews and industry-specific tags\n4. Call to Action: An engaging CTA encouraging readers to learn more\n5. Image Description: Describe what the article image shows or suggest a relevant image\n\nArticle Details:\nTitle: {{ $json.title }}\nLink: {{ $json.link }}\nDate: {{ $json.pubDate }}\nContent: {{ $json.contentSnippet || $json.content }}\n\nCreate a professional, engaging post optimized for LinkedIn and Twitter/X. Make it informative, exciting, and shareable.",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "421f4177-0209-402d-88d1-121e21a55eb3",
+      "name": "AI Content Generator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const output = item.json.output || item.json;\n  const binary = item.binary || {};\n  \n  return {\n    json: {\n      hookLine: output.hookLine,\n      summary: output.summary,\n      hashtags: Array.isArray(output.hashtags) ? output.hashtags.join(' ') : output.hashtags,\n      callToAction: output.callToAction,\n      articleLink: output.articleLink,\n      imageDescription: output.imageDescription,\n      linkedInPost: `${output.hookLine}\\n\\n${output.summary}\\n\\n${Array.isArray(output.hashtags) ? output.hashtags.join(' ') : output.hashtags}\\n\\n${output.callToAction}\\n${output.articleLink}`,\n      twitterPost: `${output.hookLine}\\n\\n${output.summary}\\n\\n${Array.isArray(output.hashtags) ? output.hashtags.join(' ') : output.hashtags}\\n\\n${output.callToAction}\\n${output.articleLink}`\n    },\n    binary: binary\n  };\n});"
+      },
+      "id": "8d62517e-4772-4c13-a3ce-b9045b790515",
+      "name": "Format Post with Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        28208
+      ]
+    },
+    {
+      "parameters": {
+        "postAs": "organization",
+        "organization": "109635195",
+        "additionalFields": {}
+      },
+      "id": "aa0b3b7d-ab33-417e-8236-23d9fccf55e3",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        1904,
+        28304
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "hlsqUJCbIm1BbXJ5",
+          "name": "LinkedIn account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.twitterPost }}",
+        "additionalFields": {
+          "attachments": "articleImage"
+        }
+      },
+      "id": "a8f603af-375a-41ad-827e-5df07bb3cf66",
+      "name": "Post to X (Twitter)",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        28112
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1nndwP8bWYDp2CsbLSD5MxIqxwi6ZE2FaHVX-R30Euic",
+          "mode": "list",
+          "cachedResultName": "Save Posted Article to History",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nndwP8bWYDp2CsbLSD5MxIqxwi6ZE2FaHVX-R30Euic/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nndwP8bWYDp2CsbLSD5MxIqxwi6ZE2FaHVX-R30Euic/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Article Link",
+              "lookupValue": "=[]"
+            }
+          ]
+        },
+        "combineFilters": "OR",
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically",
+              "readRowsUntil": "firstEmptyRow"
+            }
+          }
+        }
+      },
+      "id": "1c365128-fc62-46b8-bed1-e627dbfc8dea",
+      "name": "Save Posted Article to History",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2128,
+        28304
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YpNhaXGBABkH22On",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1520,
+        28432
+      ],
+      "id": "dc783553-0268-44d2-acfb-0557cd8e1ea6",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1W4Pik3uHh5g9b6G6hlX2j9AERvUGfMvUNNE8IoXRAGs",
+          "mode": "list",
+          "cachedResultName": "Posted Articles History",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1W4Pik3uHh5g9b6G6hlX2j9AERvUGfMvUNNE8IoXRAGs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1W4Pik3uHh5g9b6G6hlX2j9AERvUGfMvUNNE8IoXRAGs/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "title",
+              "lookupValue": "={{ $json.title }}"
+            },
+            {
+              "lookupColumn": "link",
+              "lookupValue": "={{ $json.link }}"
+            },
+            {
+              "lookupColumn": "pubDate",
+              "lookupValue": "={{ $json.pubDate }}"
+            },
+            {
+              "lookupColumn": "content",
+              "lookupValue": "={{ $json.content }}"
+            },
+            {
+              "lookupColumn": "contentSnippets",
+              "lookupValue": "={{ $json.contentSnippet }}"
+            },
+            {
+              "lookupColumn": "guid",
+              "lookupValue": "={{ $json.guid }}"
+            },
+            {
+              "lookupColumn": "isoDate",
+              "lookupValue": "={{ $json.isoDate }}"
+            }
+          ]
+        },
+        "combineFilters": "OR",
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically",
+              "readRowsUntil": "firstEmptyRow"
+            }
+          }
+        }
+      },
+      "id": "c1a5be22-065b-4363-ad26-6cd431417c3c",
+      "name": "Posted Articles History",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        28288
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YpNhaXGBABkH22On",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1216,
+        28432
+      ],
+      "id": "91fd1bc7-43ea-46af-8b84-552461062e79",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "FqhHGRERszNHoJZ3",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Daily News Trigger": [
+      {
+        "json": {
+          "timestamp": "2025-11-01T15:34:59.139+05:30",
+          "Readable date": "November 1st 2025, 3:34:59 pm",
+          "Readable time": "3:34:59 pm",
+          "Day of week": "Saturday",
+          "Year": "2025",
+          "Month": "November",
+          "Day of month": "01",
+          "Hour": "15",
+          "Minute": "34",
+          "Second": "59",
+          "Timezone": "Asia/Calcutta (UTC+05:30)"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Daily News Trigger": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Google News - Drone News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Google News - UAV Technology",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Google News - DGCA Drones India",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Google News - Drone News": {
+      "main": [
+        [
+          {
+            "node": "Combine All News Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Google News - UAV Technology": {
+      "main": [
+        [
+          {
+            "node": "Combine All News Articles",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch Google News - DGCA Drones India": {
+      "main": [
+        [
+          {
+            "node": "Combine All News Articles",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Combine All News Articles": {
+      "main": [
+        [
+          {
+            "node": "Posted Articles History",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Unposted Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unposted Articles": {
+      "main": [
+        [
+          {
+            "node": "Limit to Top 5 New Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to Top 5 New Articles": {
+      "main": [
+        [
+          {
+            "node": "Fetch Article Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Article Image": {
+      "main": [
+        [
+          {
+            "node": "AI Content Generator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Content Generator Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Post with Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Post with Image": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to X (Twitter)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Save Posted Article to History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Content Generator Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Posted Articles History": {
+      "main": [
+        [
+          {
+            "node": "Filter Unposted Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Content Generator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "6NFoZAFHpQ0bpW9j"
+  },
+  "versionId": "752734fc-416e-4cba-b424-e213740cb766",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9e484244d8154dee6fb9eb57ad81e8dd06f55102da7edc0aefc37a08246455aa"
+  },
+  "id": "6NFoZAFHpQ0bpW9j",
+  "tags": []
+}
